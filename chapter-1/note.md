@@ -1,6 +1,6 @@
 # Chapter 1
 
-## Exam ObjectiveA
+## Exam Objective
 
 kubernetes clusters need to be installed, configured, and maintained by skilled
 professionals. That's the job of a kubernetes admin.

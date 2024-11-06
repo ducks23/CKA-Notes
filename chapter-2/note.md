@@ -259,3 +259,103 @@ subjects:
     kind: User
     name: johndoe
 ```
+
+#### Get Role Bindings
+
+```
+$ kubectl get rolebindings
+
+```
+
+#### Render RoleBinding Details
+
+```
+$ kubectl describe rolebinding read-only-binding
+```
+
+## furthermore
+
+We have created a user that is read only now if we create a deployment with the
+default context but switch to user john doe, that user will not be able to get
+replicasets or delete deployments.
+
+You can verify your permissions with the `can-i` command
+
+```
+$ kubectl auth can-i --list --as johndoe
+Resources          Non-Resource URLs   Resource Names   Verbs
+...
+pods               []                  []               [list get watch]
+services           []                  []               [list get watch]
+deployments.apps   []                  []               [list get watch]
+$ kubectl auth can-i list pods --as johndoe
+yes
+
+```
+
+### Namespace and Cluster wide RBAC
+
+Roles and Rolebindings apply to a particular namespace. You will have to
+specifiy the namespace at the time of creating both objects. Sometimes, a set of
+Roles and Rolebindings needs to apply to multiple namespaces or even the whole
+cluster. Kubernetes API offers the API resources types `ClusterRole` and
+`ClusterRoleBinding`.
+
+#### Aggregating RBAC Rules
+
+You can declaritvely apply the cluster role bindings to a namespace and even add
+them together to make a single clusterRole using the aggregation of multiple
+rules
+
+for example we have two roles, list pods and delete services.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: list-pods
+  namespace: rbac-example
+  labels:
+    rbac-pod-list: "true"
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - list
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: delete-services
+  namespace: rbac-example
+  labels:
+    rbac-service-delete: "true"
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - delete
+```
+
+To Aggregate these rules clusterRoles can specify an aggregationRule.
+
+```yaml
+kind: ClusterRole
+metadata:
+  name: pods-services-aggregation-rules
+  namespace: rbac-example
+aggregationRule:
+  clusterRoleSelectors:
+    - matchLabels:
+        rbac-pod-list: "true"
+    - matchLabels:
+        rbac-service-delete: "true"
+rules: []
+```
+
+# Configuration and Installation

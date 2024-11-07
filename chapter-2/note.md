@@ -35,11 +35,13 @@ The Kubernetes API resource type(eg., a deployment or node)
 The operation that can be executed on the resource (creating a pod or deleting a
 service)
 
+---
+
 ### Creating a Subject
 
 In the context of RBAC, you can use a user account, service account, or a group
 as a subject. Users and Groups are not stored in etcd, the kubernetes database,
-and arent meant for processes running outside of the cluster. Service Accounts
+and aren't meant for processes running outside of the cluster. Service Accounts
 exist as objects in kubernetes and are use by processes running inside the
 cluster
 
@@ -52,7 +54,6 @@ credentials to the real person.
 | x.509 client certificate | Uses an OpenSSL client cert to authenticate              |
 | Basic Authentication     | Uses username and password to authenticate               |
 | Bearer Token             | USes openID (a flavor of oauth2) or webhooks as a way to |
-| authenticate             |
 
 #### How to use OpenSSL client certificate to authenticate
 
@@ -118,11 +119,12 @@ credentials to the real person.
 
 ### Service Account
 
-A user represetns a real person who commonly interacts with kubernetes using
-kubectl.
-
-A kuberentes cluster already comes with a ServiceAccount, the `default` service
-account is used if no other ServiceAccount is referenced,and lives in the `default` namespace.
+> A user represents a real person who commonly interacts with kubernetes using
+> kubectl. You can assign a service account to a pod for example if a pod is
+> running the service `helm` and needs to interact with the `kubectl` api.
+>
+> A kuberentes cluster already comes with a ServiceAccount, the `default` service
+> account is used if no other ServiceAccount is referenced,and lives in the `default` namespace.
 
 To create a customer ServiceAccount imperatively, run:
 
@@ -165,6 +167,35 @@ Mountable secrets:   build-bot-token-rvjnz
 Tokens:              build-bot-token-rvjnz
 Events:              <none>
 ```
+
+### Assign a ServiceAccount to a Pod
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: build-observer
+spec:
+  serviceAccountName: build-bot
+```
+
+## Understanding RBAC API Primitives
+
+#### Functionality
+
+##### Role
+
+> The Role API primitives declare the api resources and their operations
+> this rule should operate on. For ex. you may want to say "allow listing and
+> delteing of pods" or you may express "allow watching the logs of Pods," or
+> even both with the same role. Any operation that is not spelled out
+> explicityly is disallowed as sooon as it is bound to the subject
+
+##### RoleBinding
+
+> The RoleBinding API primitve binds the Role object to the subjects. It is the
+> glue for making the rules active. For ex., you may want to say "bind the role
+> that permits updating Services to the user John Doe"
 
 ### Create A Role
 
@@ -359,3 +390,87 @@ rules: []
 ```
 
 # Configuration and Installation
+
+> You can always retrieve the join command by running `kubeadm token create --print-join-command` on the control plane node should you lose it.
+
+1. Boostrapping a control plane node
+
+   1. ssh into machine
+   2. kubeadm init
+
+   ```bash
+      $ kubeadm init --pod-network-cidr 172.18.0.0/16 \
+        --api-server-advertise-addresss 10.8.8.10
+      ...
+      To start using your cluster, you need to run the following as a regular user:
+
+        mkdir -p $HOME/.kube
+        sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+        sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+      You should now deploy a pod network to the cluster.
+      Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+        https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+      Then you can join any number of worker nodes by running the following on \
+      each as root:
+
+      kubeadm join 10.8.8.10:6443 --token fi8io0.dtkzsy9kws56dmsp \
+          --discovery-token-ca-cert-hash \
+          sha256:cc89ea1f82d5ec460e21b69476e0c052d691d0c52cce83fbd7e403559c1ebdac
+   ```
+
+   3. copy kubeconfig for non-root users
+   4. install cni plugin
+      - `kubectl apply -f cni-plugin.yaml`
+   5. check node status
+      - `kubectl get nodes -o wide`
+
+2. set up worker node
+
+   1. ssh into machine
+   2. kubeadm join
+
+   ```
+   $ sudo kubeadm join 10.8.8.10:6443 --token fi8io0.dtkzsy9kws56dmsp \
+      --discovery-token-ca-cert-hash \
+      sha256:cc89ea1f82d5ec460e21b69476e0c052d691d0c52cce83fbd7e403559c1ebdac
+    [preflight] Running pre-flight checks
+    [preflight] Reading configuration from the cluster...
+    [preflight] FYI: You can look at this config file with \
+    'kubectl -n kube-system get cm kubeadm-config -o yaml'
+    [kubelet-start] Writing kubelet configuration to file \
+    "/var/lib/kubelet/config.yaml"
+    [kubelet-start] Writing kubelet environment file with \
+    flags to file "/var/lib/kubelet/kubeadm-flags.env"
+    [kubelet-start] Starting the kubelet
+    [kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...
+
+    This node has joined the cluster:
+    * Certificate signing request was sent to apiserver and a response was received.
+    * The Kubelet was informed of the new secure connection details.
+
+    Run 'kubectl get nodes' on the control plane to see this node join the cluster.
+   ```
+
+   3. (optional) scp kubeconfig
+   4. check node status
+   5. exit machine
+
+## HA Cluster
+
+Setting up a HA CLuster means setting up a cluster with multiple control plane
+nodes if one of them goes down. If you lose your control plane node you would
+lose all ability to use the kubectl API.
+
+#### `Stacked ETCD Topology`
+
+involves creating two or more control plane nodes where etcd is colocated on the control plane nodes. Each controle plane node hosts
+the api server, the scheduler, and the controller manager. Worker nodes
+communicate with the api server through a load balancer. It is recommended to
+operate the cluster with a minimum of three control plane nodes for redundancy
+reasons.
+
+#### `The External ETCD Node Topology`
+
+seperates etcd from the control plane node by running it on a dedicated machine.

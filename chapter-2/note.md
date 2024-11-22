@@ -187,25 +187,25 @@ spec:
 
 > The Role API primitives declare the api resources and their operations
 > this rule should operate on. For ex. you may want to say "allow listing and
-> delteing of pods" or you may express "allow watching the logs of Pods," or
+> deleting of pods" or you may express "allow watching the logs of Pods," or
 > even both with the same role. Any operation that is not spelled out
-> explicityly is disallowed as sooon as it is bound to the subject
+> explicitly is disallowed as soon as it is bound to the subject
 
 ##### RoleBinding
 
-> The RoleBinding API primitve binds the Role object to the subjects. It is the
+> The RoleBinding API primitive binds the Role object to the subjects. It is the
 > glue for making the rules active. For ex., you may want to say "bind the role
 > that permits updating Services to the user John Doe"
 
 ### Create A Role
 
 to define new roles and rolebindings you will have to use a context that allows
-for creating or midfying them, that is, cluster-admin or admin
+for creating or modifying them, that is, cluster-admin or admin.
 
 ##### Imperatively
 
 ```
-$ kubectl craete role read-only --verb=list,get,watch \
+$ kubectl create role read-only --verb=list,get,watch \
   --resource=pods,deployments,services
 role.rbac.authorization.k8s.io/read-only created
 ```
